@@ -1,0 +1,26 @@
+# .dockerignore --- Configures files to exclude from the generated Docker image.
+
+# --------------------
+# Project Files
+# --------------------
+.git
+.gitignore
+.dockerignore
+bin
+docs
+Dockerfile
+docker-compose*.yml
+
+
+# --------------------
+# Generated Files
+# --------------------
+__pycache__
+build/bdist.*
+build/lib
+dist
+venv
+*.eggs
+*.pyc
+*.egg-info
+*.log

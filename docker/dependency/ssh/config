@@ -1,0 +1,7 @@
+Host *
+    StrictHostKeyChecking no
+
+Host cdn-gitlab.363-283.io
+#    Hostname 10.10.1.21
+#    IdentitiesOnly yes
+    Port 2252

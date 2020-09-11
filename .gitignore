@@ -1,0 +1,54 @@
+# .gitignore --- Configures files to ignore from this Git repository.
+
+# --------------------
+# Generated Files
+# --------------------
+build
+cache
+dist
+htmlcov
+venv
+coverage.txt
+__pycache__
+*/static/version.json
+*/static/*.pdf
+*/static/apidocs
+pylint.txt
+*.pyc
+*.egg-info
+*.eggs
+*.zip
+*.log
+*.pdf
+/**/.hypothesis
+
+
+# --------------------
+# IDE Cruft
+# --------------------
+.classpath
+.dir-locals.el
+.project
+.settings
+*.iml
+.idea
+.vscode
+classes
+nbproject
+nb-configuration.xml
+nbactions.xml
+
+
+# --------------------
+# Docker
+# --------------------
+docker/tmp/*
+
+
+# --------------------
+# Misc.
+# --------------------
+.coverage
+rpms
+.DS_Store
+*~

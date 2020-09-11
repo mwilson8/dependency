@@ -1,0 +1,38 @@
+{
+    "version": 1,
+    "disable_existing_loggers": false,
+    "formatters": {
+        "defaultFormat": {
+            "format": "%(asctime)-15s | %(name)-12s | %(thread)d | %(levelname)-8s | %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S"
+        }
+    },
+    "handlers": {
+        "StreamHandler": {
+            "class": "logging.StreamHandler",
+            "formatter": "defaultFormat",
+            "level": "DEBUG"
+        },
+        "FileHandler": {
+            "class": "logging.FileHandler",
+            "formatter": "defaultFormat",
+            "filename": "logs/dependency.log",
+            "level": "DEBUG",
+            "delay": true
+        }
+    },
+    "loggers": {
+        "dependency": {"level": "INFO" },
+        "urllib3": { "level": "WARNING" },
+        "kazoo": { "level": "WARNING" },
+        "botocore": { "level": "WARNING" },
+        "cte.server.access_control_filter": { "level": "WARNING" }
+    },
+    "root": {
+        "handlers": [
+            "StreamHandler",
+            "FileHandler"
+        ],
+        "level": "WARNING"
+    }
+}

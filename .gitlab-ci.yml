@@ -1,0 +1,117 @@
+# .gitlab-ci.yml --- GitLab CI configuration.
+image: cdn-docker.363-283.io/docker/backend:python-3.6-slim
+
+stages:
+  - test
+  - build
+  - deploy
+  - release
+
+
+variables:
+  CDN_DOCKER: cdn-docker.363-283.io
+  PYTHONDONTWRITEBYTECODE: "true"
+  DOCKER_DRIVER: overlay
+
+test-project:
+  stage: test
+  tags:
+    - Plexus-Postgres
+  script:
+    - ${CI_PROJECT_DIR}/scripts/test.sh
+  except:
+    refs:
+      - test
+      - master
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /^\[CI\].*/
+
+
+# Build the Service and RPM
+build-rpm-job:
+  stage: build
+  tags:
+    - Plexus-Postgres
+  script:
+    - ${CI_PROJECT_DIR}/scripts/build_rpm.sh
+  artifacts:
+    name: "${CI_PROJECT_NAME}-${BUILD_NUMBER}"
+    expire_in: 1 week
+    paths:
+      - dist/
+  only:
+    - develop
+    - tags
+  except:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /$IGNORE_PIPELINE_REGEX/
+
+
+publish-rpm-job:
+  stage: deploy
+  image: cdn-docker.363-283.io/docker/backend:python-3.6-slim
+  tags:
+    - Plexus-Postgres
+  dependencies:
+    - build-rpm-job
+  script:
+    - ${CI_PROJECT_DIR}/scripts/publish_rpm.sh
+  only:
+    - develop
+    - tags
+  except:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /$IGNORE_PIPELINE_REGEX/
+
+
+# Build the Docker image
+build-docker:
+  stage: build
+  tags:
+    - Plexus-Postgres
+  script:
+    - ${CI_PROJECT_DIR}/scripts/build_docker.sh
+  artifacts:
+    name: "${CI_PROJECT_NAME}-${BUILD_NUMBER}"
+    expire_in: 1 week
+    paths:
+      - dist/
+  only:
+    - develop
+    - tags
+  except:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /^\[CI\].*/
+
+
+# deploy docker image to the gitlab docker registry
+publish-docker:
+  stage: deploy
+  tags:
+    - Plexus-Postgres
+  dependencies:
+    - build-docker
+  script:
+    - ${CI_PROJECT_DIR}/scripts/publish_docker.sh
+  only:
+    - develop
+    - tags
+  except:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /^\[CI\].*/
+
+
+tag-project:
+  stage: release
+  tags:
+    - Plexus-Postgres
+  when: manual
+  environment:
+    name: test
+  script:
+    - ${CI_PROJECT_DIR}/scripts/release_to_test.sh
+  only:
+    - develop
+  except:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /^\[CI\].*/

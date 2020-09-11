@@ -1,0 +1,22 @@
+version: '3.6'
+services:
+
+  dependency:
+    environment:
+      DIR_TO_RELOAD: /usr/src/app/dependency
+    ports:
+      - "8000:8000"
+
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
+
+  cte-aac-service:
+    ports:
+      - "8443:8443"
+
+  zk.docker:
+    ports:
+      - "2181:2181"
+  

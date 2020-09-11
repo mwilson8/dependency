@@ -1,0 +1,190 @@
+#!/bin/sh
+# functions --- Common utilities for building Chimera projects.
+
+# Get the version number for a Python project.
+#
+# This function will print the version number to stdout.
+#
+# Parameters
+# ----------
+# default_version (optional):  The default version to use if one could not be
+#                              determined. Defaults to 1.0.0
+py_app_version () {
+  local default_version=${1:-1.0.0}
+  local app_version=$(python setup.py --version)
+
+  if [ $? -eq 1 ]; then  # unable to get version from setup.py
+    app_version=default_version
+  fi
+
+  echo $app_version
+}
+
+
+# Get the version number for a NodeJS project.
+#
+# This function will print the version number to stdout.
+#
+# Parameters
+# ----------
+# project_name:                The name of the project as defined in package.json (e.g. foo-web-ui)
+# default_version (optional):  The default version to use if one could not be
+#                              determined. Defaults to 1.0.0
+npm_app_version () {
+  local project_name=${1}
+  local default_version=${2:-1.0.0}
+  local app_version=$(node -p "require('./package.json').version")
+
+  if [ $? -eq 1 ]; then  # unable to get version
+    app_version=default_version
+  fi
+
+  echo $app_version
+}
+
+
+# Determine the docker tag for the current build.
+#
+# This function will print the docker tag to stdout.
+#
+# Parameters
+# ----------
+# commit_tag (optional):  The name of that tag that triggered the build. If a
+#                         value is not provided or is empty, the tag name will
+#                         default to "latest".
+determine_docker_tag () {
+  local commit_tag="$1"
+
+  if [ -z "$commit_tag" ]; then
+    image_tag="latest"
+  else
+    # use the git tag sans leading 'v'
+    image_tag="$(echo $commit_tag | sed 's/^v//')"
+  fi
+
+  echo $image_tag
+}
+
+
+# Determine the latest version based on the project's tags.
+#
+# NOTE: this function assumes that a project is using tags with the format: vMAJOR.MINOR.PATCH
+#
+# Parameters
+# ----------
+# major_minor (optional):  A string representing the project's version without
+#                          the path (i.e. in the format MAJOR.MINOR)
+#
+determine_latest_git_tag () {
+  # NOTE: this assumes that you are revving a 1.0.x patch and not a major or
+  #       minor release. For those, you will also need to change the
+  #      `ref/tags/<MAJOR>.<MINOR>*` reference below to match the version you
+  #       are working with.
+  local major_minor=${1:-1.0}
+  local latest_tag=`git for-each-ref --sort=-taggerdate --format '%(tag)' refs/tags/v$major_minor* \
+    | sed s/0-//g \
+    | awk -F . 'NF >= 3' \
+    | head -n 1`
+
+    if [ -z "$latest_tag" ]; then
+      latest_tag=v$major_minor.0
+    fi
+
+  echo $latest_tag
+}
+
+
+# Initialize the current git repository.
+#
+# This function will set the push origin and user email address for commits.
+#
+# Parameters
+# ----------
+# project_path (required):  The project namespace/project_name.
+# user_email   (required):  The current user's email address.
+#
+git_init () {
+  local project_path=$1
+  local user_email=$2
+
+  git remote set-url --push origin ssh://git@cdn-gitlab.363-283.io:2252/$project_path.git
+  git config user.email "$user_email"
+  git remote -v
+}
+
+
+# Install dependencies and Reduce duplicated dependencies.
+#
+# Parameters
+# ----------
+# project_dir     (required):   The project's root directory.
+# npm_auth_token  (required):  The token used to authenticate with the CDN NPM registry.
+#
+npm_init () {
+  local project_dir=${1}
+  local npm_auth_token=${2}
+
+  rm -f $project_dir/.npmrc
+  echo "//npm.363-283.io/:_authToken=$npm_auth_token" >> $project_dir/.npmrc
+  npm set registry https://npm.363-283.io
+  npm set progress=false
+  npm install --unsafe-perm --no-color
+  npm dedupe
+}
+
+
+# Start the Docker daemon and login to the local registry.
+#
+start_and_initialize_docker () {
+  if docker info >/dev/null 2>&1; then
+    echo ">> docker is already running"
+  else
+    echo ">> starting docker daemon"
+    service docker start
+    sleep 2
+    docker login -u gitlab-ci-token -p ${CI_BUILD_TOKEN} cdn-docker.363-283.io
+  fi
+}
+
+
+# Echo the given message to stderr.
+#
+# Parameters
+# ----------
+# message  (required):  The message to echo.
+log_error () {
+  >&2 echo $@
+}
+
+
+# Update the CHANGELOG.md file in preparation for a release.
+#
+# This function will replace the [Unreleased] heading with a new heading that
+# includes the version and release date (e.g. [1.2.3] - 1/1/2019).
+#
+# Example:
+#     changelog_release $RELEASE_VERSION $LATEST_TAG $CI_PROJECT_PATH
+# or
+#     changelog_release $RELEASE_VERSION $LATEST_TAG $CI_PROJECT_PATH $TODAY
+#
+# Parameters
+# ----------
+# release_version  (required):  The version to release.
+# latest_tag       (required):  The latest version determined from the git tags.
+# project_path     (required):  The namespace with project name.
+# today            (optional):  The release date. Defaults to today (%Y-%m-%d).
+#
+changelog_release () {
+  local release_version=$1
+  local latest_tag=$2
+  local project_path=$3
+  local today=${4:-$(date +"%Y-%m-%d")}
+
+  # update project's changelog to reflect released version and date
+  sed -e "s/\[Unreleased\]$/[$release_version] - $today/" \
+      -e "/\[Unreleased\]:/s/$latest_tag/v$release_version/" \
+      -e "/\[Unreleased\]:/a\\
+[$release_version]: https://cdn-gitlab.363-283.io/$project_path/compare/$latest_tag...v$release_version
+  " CHANGELOG.md > CHANGELOG.md-tmp
+  if [ -f CHANGELOG.md-tmp ]; then mv CHANGELOG.md-tmp CHANGELOG.md; fi
+}
